@@ -43,6 +43,7 @@ h1 .num{font-family:var(--f-display);font-weight:400;font-size:1.5em;color:var(-
 .seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
 .speed{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
 .speed .seg button{padding:4px 11px;font-size:13px}
+.order-seg button{padding:5px 14px;font-size:13px}
 .seg .badge{display:inline-block;min-width:1.6em;margin-left:6px;padding:0 6px;border-radius:999px;background:var(--soft);color:var(--accent);font-size:12px;font-weight:700;line-height:1.6;text-align:center;font-variant-numeric:tabular-nums}
 .seg button[aria-pressed="true"] .badge{background:var(--accent-ink);color:var(--accent)}
 .seg .badge:empty{display:none}
@@ -305,7 +306,9 @@ function renderDrill(){
       DATA.cats.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
     bar = `<div class="drill-bar">
       <select id="d-filter" aria-label="出題範囲">${opts}</select>
-      <button class="ghost" id="d-shuffle" aria-pressed="${st.shuffled}">${st.shuffled?'シャッフル中':'順番どおり'}</button>
+    </div>
+    <div class="drill-bar">
+      <div class="seg order-seg" role="group" aria-label="出題順"><button data-order="seq" aria-pressed="${!st.shuffled}">順番通り</button><button data-order="shuf" aria-pressed="${st.shuffled}">シャッフル</button></div>
       <span class="tally">言えた <b>${got.size}</b> / 39</span>
     </div>`;
     body = it ? cardHtml(it, st, mode)
@@ -315,7 +318,7 @@ function renderDrill(){
       <span class="where-sm">瞬間英作文で「分からなかった」を押した問題がここに集まります。「もう覚えた」を押すとリストから外れます。</span>
     </div>
     ${miss.size ? `<div class="drill-bar">
-      <button class="ghost" id="d-shuffle" aria-pressed="${st.shuffled}">${st.shuffled?'シャッフル中':'順番どおり'}</button>
+      <div class="seg order-seg" role="group" aria-label="出題順"><button data-order="seq" aria-pressed="${!st.shuffled}">順番通り</button><button data-order="shuf" aria-pressed="${st.shuffled}">シャッフル</button></div>
       <span class="tally">復習リスト <b style="color:var(--miss)">${miss.size}</b> 問</span>
     </div>` : ''}`;
     body = it ? cardHtml(it, st, mode)
@@ -341,7 +344,7 @@ document.getElementById('drill').addEventListener('click', e=>{
   if(t.id==='d-reset'){ confirming = true; renderDrill(); return; }
   if(t.id==='d-reset-no'){ confirming = false; renderDrill(); return; }
   if(t.id==='d-reset-yes'){ confirming = false; miss.clear(); saveAll(); buildDeck('review'); renderDrill(); return; }
-  if(t.id==='d-shuffle'){ st.shuffled=!st.shuffled; buildDeck(mode); renderDrill(); return; }
+  if(t.dataset.order){ st.shuffled = t.dataset.order==='shuf'; buildDeck(mode); renderDrill(); return; }
   if(t.id==='d-prev'){ st.idx=Math.max(0,st.idx-1); st.step=0; renderDrill(); return; }
   if(t.id==='d-next'){ st.idx=(st.idx+1)%st.deck.length; st.step=0; renderDrill(); return; }
   if(t.classList.contains('play')){ playKeys([t.dataset.k],[t]); return; }
