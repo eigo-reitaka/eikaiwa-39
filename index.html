@@ -13,7 +13,7 @@
 /* Layout: one reading column of pattern cards, grouped by situation; a study-mode switch turns the column into a single flashcard drill. */
 :root{
   --paper:#F4F6F3; --card:#FFFFFF; --ink:#1B2630; --muted:#5B686C; --line:#D9E0DC;
-  --accent:#1E6B59; --accent-ink:#FFFFFF; --soft:#E6EFEB; --marker:rgba(240,210,80,.55); --ok:#2E7D4F;
+  --accent:#1E6B59; --accent-ink:#FFFFFF; --soft:#E6EFEB; --marker:rgba(240,210,80,.55); --ok:#2E7D4F; --miss:#B2552E;
   --f-display:"Instrument Serif",Georgia,"Times New Roman",serif;
   --f-en:"Literata",Georgia,serif;
   --f-pat:"Hiragino Sans","Hiragino Kaku Gothic ProN","ヒラギノ角ゴシック","Zen Kaku Gothic New",sans-serif;
@@ -21,10 +21,10 @@
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --paper:#11181B; --card:#182124; --ink:#E6ECEA; --muted:#98A6A4; --line:#2A3639;
-  --accent:#6FC3A8; --accent-ink:#0E1A16; --soft:#1F2C2B; --marker:rgba(212,180,60,.38); --ok:#74C995; color-scheme:dark}}
+  --accent:#6FC3A8; --accent-ink:#0E1A16; --soft:#1F2C2B; --marker:rgba(212,180,60,.38); --ok:#74C995; --miss:#E39470; color-scheme:dark}}
 :root[data-theme="dark"]{
   --paper:#11181B; --card:#182124; --ink:#E6ECEA; --muted:#98A6A4; --line:#2A3639;
-  --accent:#6FC3A8; --accent-ink:#0E1A16; --soft:#1F2C2B; --marker:rgba(212,180,60,.38); --ok:#74C995; color-scheme:dark}
+  --accent:#6FC3A8; --accent-ink:#0E1A16; --soft:#1F2C2B; --marker:rgba(212,180,60,.38); --ok:#74C995; --miss:#E39470; color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--paper);color:var(--ink);font-family:var(--f-jp);font-size:15px;line-height:1.75;-webkit-font-smoothing:antialiased}
 .wrap{max-width:960px;margin:0 auto;padding-inline:18px;padding-block:28px 80px}
@@ -43,6 +43,13 @@ h1 .num{font-family:var(--f-display);font-weight:400;font-size:1.5em;color:var(-
 .seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
 .speed{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
 .speed .seg button{padding:4px 11px;font-size:13px}
+.seg .badge{display:inline-block;min-width:1.6em;margin-left:6px;padding:0 6px;border-radius:999px;background:var(--soft);color:var(--accent);font-size:12px;font-weight:700;line-height:1.6;text-align:center;font-variant-numeric:tabular-nums}
+.seg button[aria-pressed="true"] .badge{background:var(--accent-ink);color:var(--accent)}
+.seg .badge:empty{display:none}
+.miss-tag{color:var(--miss);font-weight:700}
+.empty-actions{display:flex;gap:10px;flex-wrap:wrap}
+.linkbtn{border:0;background:transparent;color:var(--muted);font-size:13px;text-decoration:underline;padding:4px 0}
+.confirm{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;color:var(--muted)}
 
 .chips{display:flex;gap:6px;overflow-x:auto;padding-block:12px 4px;scrollbar-width:none}
 .chips::-webkit-scrollbar{display:none}
@@ -125,7 +132,7 @@ mark{background:linear-gradient(transparent 52%,var(--marker) 52%);color:inherit
 footer{margin-top:48px;font-size:12px;color:var(--muted)}
 @media (prefers-reduced-motion: no-preference){.hint,.answer{animation:in .18s ease-out}}
 @keyframes in{from{opacity:.4;transform:translateY(3px)}to{opacity:1;transform:none}}
-@media (max-width:440px){.body{padding:16px}.pat{font-size:21px}.flash{padding:20px 16px}}
+@media (max-width:440px){.mode-seg button{padding:6px 10px;font-size:13px}.body{padding:16px}.pat{font-size:21px}.flash{padding:20px 16px}}
 </style>
 
 </head>
@@ -138,9 +145,10 @@ footer{margin-top:48px;font-size:12px;color:var(--muted)}
   </header>
 
   <div class="controls">
-    <div class="seg" role="group" aria-label="モード">
+    <div class="seg mode-seg" role="group" aria-label="モード">
       <button id="m-learn" aria-pressed="true">読む・聞く</button>
       <button id="m-drill" aria-pressed="false">瞬間英作文</button>
+      <button id="m-review" aria-pressed="false">間違えた問題の復習<span class="badge" id="miss-count"></span></button>
     </div>
     <div class="speed"><span>音声</span>
       <div class="seg" role="group" aria-label="再生速度">
@@ -237,85 +245,141 @@ document.getElementById('learn').addEventListener('click', e=>{
   }
 });
 
-/* ---------- drill view ---------- */
+/* ---------- drill & review ---------- */
 const store = { get(k,d){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch(e){ return d; } },
                 set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} } };
 let got = new Set(store.get('eikaiwa39-got', []));
-let deck = [], idx = 0, step = 0, catFilter = 'all', shuffled = false;
+/* miss: Map of item number -> times answered "もう一度" since last success */
+let miss = new Map(store.get('eikaiwa39-miss', []));
+const saveAll = ()=>{ store.set('eikaiwa39-got',[...got]); store.set('eikaiwa39-miss',[...miss]); updateBadge(); };
+function updateBadge(){ document.getElementById('miss-count').textContent = miss.size ? miss.size : ''; }
 
-function buildDeck(){
-  deck = DATA.items.filter(it => catFilter==='all' || (catFilter==='todo' ? !got.has(it.n) : it.cat===catFilter));
-  if(shuffled){ for(let i=deck.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [deck[i],deck[j]]=[deck[j],deck[i]]; } }
-  idx = 0; step = 0;
+let mode = 'learn', confirming = false;
+const S = {
+  drill:  {deck:[], idx:0, step:0, filter:'all', shuffled:false},
+  review: {deck:[], idx:0, step:0, shuffled:false}
+};
+const byNo = n => DATA.items.find(it=>it.n===n);
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function buildDeck(m){
+  const st = S[m];
+  if(m==='drill'){
+    const f = st.filter;
+    st.deck = DATA.items.filter(it => f==='all' || (f==='todo' ? !got.has(it.n) : it.cat===f));
+  } else {
+    st.deck = [...miss.keys()].map(byNo).filter(Boolean);
+  }
+  if(st.shuffled) shuffle(st.deck);
+  st.idx = 0; st.step = 0;
 }
+
+function cardHtml(it, st, m){
+  const hints = [];
+  if(st.step>=1) hints.push(`<div class="hint"><span class="k">ヒント1　型</span><span class="v pat2">${esc(it.pat)}</span><span class="ja">${esc(it.mean)}</span></div>`);
+  if(st.step>=2) hints.push(`<div class="hint"><span class="k">ヒント2　使う単語</span><span class="v">${it.words.map(esc).join('　/　')}</span></div>`);
+  const status = miss.has(it.n) ? `　<span class="miss-tag">間違えた回数 ${miss.get(it.n)}回</span>` : (got.has(it.n) ? '　<span class="done">言えた</span>' : '');
+  return `<div class="flash">
+    <div class="flash-meta"><span>${st.idx+1} / ${st.deck.length}</span><span>No.${it.n}　${DATA.cats.find(c=>c.id===it.cat).name}${status}</span></div>
+    <div><div class="where-sm">場面：${esc(it.scene)}</div><p class="prompt-ja">${esc(it.exJa)}</p></div>
+    <div class="hints">
+      <button class="hbtn" data-step="1" ${st.step>=1?'disabled':''}>ヒント1：型</button>
+      <button class="hbtn" data-step="2" ${st.step>=2?'disabled':''}>ヒント2：使う単語</button>
+      <button class="hbtn main" data-step="3" ${st.step>=3?'disabled':''}>答えを見る</button>
+    </div>
+    ${hints.length?`<div class="hintbox">${hints.join('')}</div>`:''}
+    ${st.step>=3?`<div class="answer"><div class="label">答え</div>
+      <div class="line">${playBtn(it.n+'-ex','答えを再生')}<div class="txt"><div class="en">${marked(it.ex,it.hl)}</div></div></div>
+      ${m==='review'
+        ? `<div class="judge"><button class="yes" data-judge="mastered">もう覚えた ✓</button><button data-judge="0">まだ → 次へ</button></div>`
+        : `<div class="judge"><button class="yes" data-judge="1">言えた → 次へ</button><button data-judge="0">もう一度 → 次へ</button></div>`}</div>`:''}
+    ${m==='review' && st.step<3 ? `<div><button class="linkbtn" data-judge="mastered">答えを見ずに「もう覚えた」にする</button></div>` : ''}
+  </div>`;
+}
+
 function renderDrill(){
   const el = document.getElementById('drill');
-  const opts = `<option value="all">すべての型（39）</option><option value="todo">まだ「言えた」になっていない型</option>` +
-    DATA.cats.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
-  const it = deck[idx];
-  let card;
-  if(!it){
-    card = `<div class="flash"><p class="prompt-ja">この範囲の型はすべて「言えた」になりました。</p><p class="where-sm">ほかのカテゴリを選ぶか、「すべての型」でもう一周してみましょう。</p></div>`;
-  } else {
-    const hints = [];
-    if(step>=1) hints.push(`<div class="hint"><span class="k">ヒント1　型</span><span class="v pat2">${esc(it.pat)}</span><span class="ja">${esc(it.mean)}</span></div>`);
-    if(step>=2) hints.push(`<div class="hint"><span class="k">ヒント2　使う単語</span><span class="v">${it.words.map(esc).join('　/　')}</span></div>`);
-    card = `<div class="flash">
-      <div class="flash-meta"><span>${idx+1} / ${deck.length}</span><span>No.${it.n}　${DATA.cats.find(c=>c.id===it.cat).name}${got.has(it.n)?'　<span class="done">言えた</span>':''}</span></div>
-      <div><div class="where-sm">場面：${esc(it.scene)}</div><p class="prompt-ja">${esc(it.exJa)}</p></div>
-      <div class="hints">
-        <button class="hbtn" data-step="1" ${step>=1||step>=3?'disabled':''}>ヒント1：型</button>
-        <button class="hbtn" data-step="2" ${step>=2||step>=3?'disabled':''}>ヒント2：使う単語</button>
-        <button class="hbtn main" data-step="3" ${step>=3?'disabled':''}>答えを見る</button>
-      </div>
-      ${hints.length?`<div class="hintbox">${hints.join('')}</div>`:''}
-      ${step>=3?`<div class="answer"><div class="label">答え</div>
-        <div class="line">${playBtn(it.n+'-ex','答えを再生')}<div class="txt"><div class="en">${marked(it.ex,it.hl)}</div></div></div>
-        <div class="judge"><button class="yes" data-judge="1">言えた → 次へ</button><button data-judge="0">もう一度 → 次へ</button></div></div>`:''}
-    </div>`;
-  }
-  el.innerHTML = `<div class="drill-bar">
+  const st = S[mode], it = st.deck[st.idx];
+  let bar, body;
+  if(mode==='drill'){
+    const opts = `<option value="all">すべての型（39）</option><option value="todo">まだ「言えた」になっていない型</option>` +
+      DATA.cats.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+    bar = `<div class="drill-bar">
       <select id="d-filter" aria-label="出題範囲">${opts}</select>
-      <button class="ghost" id="d-shuffle" aria-pressed="${shuffled}">${shuffled?'シャッフル中':'順番どおり'}</button>
+      <button class="ghost" id="d-shuffle" aria-pressed="${st.shuffled}">${st.shuffled?'シャッフル中':'順番どおり'}</button>
       <span class="tally">言えた <b>${got.size}</b> / 39</span>
-    </div>${card}
-    ${it?`<div class="nav"><button class="ghost" id="d-prev" ${idx===0?'disabled':''}>← 前へ</button><button class="ghost" id="d-next">次へ →</button></div>`:''}`;
-  document.getElementById('d-filter').value = catFilter;
+    </div>`;
+    body = it ? cardHtml(it, st, mode)
+      : `<div class="flash"><p class="prompt-ja">この範囲の型はすべて「言えた」になりました。</p><p class="where-sm">ほかのカテゴリを選ぶか、「すべての型」でもう一周してみましょう。</p></div>`;
+  } else {
+    bar = `<div class="drill-bar">
+      <span class="where-sm">瞬間英作文で「もう一度」を押した問題がここに集まります。「もう覚えた」を押すとリストから外れます。</span>
+    </div>
+    ${miss.size ? `<div class="drill-bar">
+      <button class="ghost" id="d-shuffle" aria-pressed="${st.shuffled}">${st.shuffled?'シャッフル中':'順番どおり'}</button>
+      <span class="tally">復習リスト <b style="color:var(--miss)">${miss.size}</b> 問</span>
+    </div>` : ''}`;
+    body = it ? cardHtml(it, st, mode)
+      : `<div class="flash"><p class="prompt-ja">${miss.size===0 && got.size ? '復習リストはすべてクリアしました。' : 'まだ間違えた問題はありません。'}</p>
+          <p class="where-sm">瞬間英作文で答えを見て「もう一度」を押すと、その問題がここに記録されます。</p>
+          <div class="empty-actions"><button class="hbtn main" id="go-drill">瞬間英作文へ</button></div></div>`;
+  }
+  const foot = it ? `<div class="nav"><button class="ghost" id="d-prev" ${st.idx===0?'disabled':''}>← 前へ</button><button class="ghost" id="d-next">次へ →</button></div>` : '';
+  const reset = (mode==='review' && miss.size) ? (confirming
+      ? `<div class="confirm">復習リストを空にしますか？<button class="ghost" id="d-reset-yes">空にする</button><button class="ghost" id="d-reset-no">やめる</button></div>`
+      : `<div><button class="linkbtn" id="d-reset">復習リストを空にする</button></div>`) : '';
+  el.innerHTML = bar + body + foot + reset;
+  const f = document.getElementById('d-filter'); if(f) f.value = S.drill.filter;
 }
+
 document.getElementById('drill').addEventListener('change', e=>{
-  if(e.target.id==='d-filter'){ catFilter = e.target.value; buildDeck(); renderDrill(); }
+  if(e.target.id==='d-filter'){ S.drill.filter = e.target.value; buildDeck('drill'); renderDrill(); }
 });
 document.getElementById('drill').addEventListener('click', e=>{
   const t = e.target.closest('button'); if(!t) return;
-  if(t.id==='d-shuffle'){ shuffled=!shuffled; buildDeck(); renderDrill(); return; }
-  if(t.id==='d-prev'){ idx=Math.max(0,idx-1); step=0; renderDrill(); return; }
-  if(t.id==='d-next'){ idx=(idx+1)%deck.length; step=0; renderDrill(); return; }
+  const st = S[mode];
+  if(t.id==='go-drill'){ setMode('drill'); return; }
+  if(t.id==='d-reset'){ confirming = true; renderDrill(); return; }
+  if(t.id==='d-reset-no'){ confirming = false; renderDrill(); return; }
+  if(t.id==='d-reset-yes'){ confirming = false; miss.clear(); saveAll(); buildDeck('review'); renderDrill(); return; }
+  if(t.id==='d-shuffle'){ st.shuffled=!st.shuffled; buildDeck(mode); renderDrill(); return; }
+  if(t.id==='d-prev'){ st.idx=Math.max(0,st.idx-1); st.step=0; renderDrill(); return; }
+  if(t.id==='d-next'){ st.idx=(st.idx+1)%st.deck.length; st.step=0; renderDrill(); return; }
   if(t.classList.contains('play')){ playKeys([t.dataset.k],[t]); return; }
-  if(t.dataset.step){
-    step = Math.max(step, +t.dataset.step); renderDrill();
-    return;
-  }
+  if(t.dataset.step){ st.step = Math.max(st.step, +t.dataset.step); renderDrill(); return; }
   if(t.dataset.judge!==undefined){
-    const it = deck[idx];
-    if(t.dataset.judge==='1') got.add(it.n); else got.delete(it.n);
-    store.set('eikaiwa39-got',[...got]);
-    if(catFilter==='todo'){ buildDeck(); } else { idx=(idx+1)%deck.length; step=0; }
+    const it = st.deck[st.idx], j = t.dataset.judge;
+    const mastered = j==='mastered';
+    if(mastered){ got.add(it.n); miss.delete(it.n); }
+    else if(j==='1'){ got.add(it.n); }
+    else { got.delete(it.n); miss.set(it.n, (miss.get(it.n)||0)+1); }
+    saveAll();
+    if(mastered){
+      st.deck.splice(st.idx,1);
+      if(st.idx>=st.deck.length) st.idx=0;
+      st.step=0;
+    } else if(mode==='drill' && S.drill.filter==='todo'){
+      buildDeck('drill');
+    } else {
+      st.idx=(st.idx+1)%st.deck.length; st.step=0;
+    }
     renderDrill();
   }
 });
 
 /* ---------- mode & speed ---------- */
 function setMode(m){
-  document.getElementById('m-learn').setAttribute('aria-pressed', m==='learn');
-  document.getElementById('m-drill').setAttribute('aria-pressed', m==='drill');
+  mode = m; confirming = false;
+  for(const k of ['learn','drill','review']) document.getElementById('m-'+k).setAttribute('aria-pressed', m===k);
   document.getElementById('learn').hidden = m!=='learn';
-  document.getElementById('drill').hidden = m!=='drill';
+  document.getElementById('drill').hidden = m==='learn';
   player.pause(); queue=[]; clearActive();
-  if(m==='drill') renderDrill();
+  if(m==='review') buildDeck('review');
+  if(m!=='learn') renderDrill();
   store.set('eikaiwa39-mode', m);
 }
 document.getElementById('m-learn').onclick = ()=>setMode('learn');
 document.getElementById('m-drill').onclick = ()=>setMode('drill');
+document.getElementById('m-review').onclick = ()=>setMode('review');
 function setRate(r){
   rate = r;
   document.getElementById('sp-1').setAttribute('aria-pressed', r===1);
@@ -324,8 +388,12 @@ function setRate(r){
 document.getElementById('sp-1').onclick = ()=>setRate(1);
 document.getElementById('sp-2').onclick = ()=>setRate(0.75);
 
-renderLearn(); buildDeck();
-if(location.hash==='#drill' || store.get('eikaiwa39-mode','learn')==='drill') setMode('drill');
+renderLearn(); buildDeck('drill'); updateBadge();
+{
+  const h = location.hash.replace('#','');
+  const start = (h==='drill'||h==='review') ? h : store.get('eikaiwa39-mode','learn');
+  if(start==='drill'||start==='review') setMode(start);
+}
 </script>
 
 </body>
