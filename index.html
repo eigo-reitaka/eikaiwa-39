@@ -148,7 +148,7 @@ footer{margin-top:48px;font-size:12px;color:var(--muted)}
     <div class="seg mode-seg" role="group" aria-label="モード">
       <button id="m-learn" aria-pressed="true">話す・聞く</button>
       <button id="m-drill" aria-pressed="false">瞬間英作文</button>
-      <button id="m-review" aria-pressed="false">間違えた問題の復習<span class="badge" id="miss-count"></span></button>
+      <button id="m-review" aria-pressed="false">分からなかった問題の復習<span class="badge" id="miss-count"></span></button>
     </div>
     <div class="speed"><span>音声</span>
       <div class="seg" role="group" aria-label="再生速度">
@@ -277,7 +277,7 @@ function cardHtml(it, st, m){
   const hints = [];
   if(st.step>=1) hints.push(`<div class="hint"><span class="k">ヒント1　型</span><span class="v pat2">${esc(it.pat)}</span><span class="ja">${esc(it.mean)}</span></div>`);
   if(st.step>=2) hints.push(`<div class="hint"><span class="k">ヒント2　使う単語</span><span class="v">${it.words.map(esc).join('　/　')}</span></div>`);
-  const status = miss.has(it.n) ? `　<span class="miss-tag">間違えた回数 ${miss.get(it.n)}回</span>` : (got.has(it.n) ? '　<span class="done">言えた</span>' : '');
+  const status = miss.has(it.n) ? `　<span class="miss-tag">分からなかった回数 ${miss.get(it.n)}回</span>` : (got.has(it.n) ? '　<span class="done">言えた</span>' : '');
   return `<div class="flash">
     <div class="flash-meta"><span>${st.idx+1} / ${st.deck.length}</span><span>No.${it.n}　${DATA.cats.find(c=>c.id===it.cat).name}${status}</span></div>
     <div><div class="where-sm">場面：${esc(it.scene)}</div><p class="prompt-ja">${esc(it.exJa)}</p></div>
@@ -291,7 +291,7 @@ function cardHtml(it, st, m){
       <div class="line">${playBtn(it.n+'-ex','答えを再生')}<div class="txt"><div class="en">${marked(it.ex,it.hl)}</div></div></div>
       ${m==='review'
         ? `<div class="judge"><button class="yes" data-judge="mastered">もう覚えた ✓</button><button data-judge="0">まだ → 次へ</button></div>`
-        : `<div class="judge"><button class="yes" data-judge="1">言えた → 次へ</button><button data-judge="0">もう一度 → 次へ</button></div>`}</div>`:''}
+        : `<div class="judge"><button class="yes" data-judge="1">言えた → 次へ</button><button data-judge="0">分からなかった → 次へ</button></div>`}</div>`:''}
     ${m==='review' && st.step<3 ? `<div><button class="linkbtn" data-judge="mastered">答えを見ずに「もう覚えた」にする</button></div>` : ''}
   </div>`;
 }
@@ -312,15 +312,15 @@ function renderDrill(){
       : `<div class="flash"><p class="prompt-ja">この範囲の型はすべて「言えた」になりました。</p><p class="where-sm">ほかのカテゴリを選ぶか、「すべての型」でもう一周してみましょう。</p></div>`;
   } else {
     bar = `<div class="drill-bar">
-      <span class="where-sm">瞬間英作文で「もう一度」を押した問題がここに集まります。「もう覚えた」を押すとリストから外れます。</span>
+      <span class="where-sm">瞬間英作文で「分からなかった」を押した問題がここに集まります。「もう覚えた」を押すとリストから外れます。</span>
     </div>
     ${miss.size ? `<div class="drill-bar">
       <button class="ghost" id="d-shuffle" aria-pressed="${st.shuffled}">${st.shuffled?'シャッフル中':'順番どおり'}</button>
       <span class="tally">復習リスト <b style="color:var(--miss)">${miss.size}</b> 問</span>
     </div>` : ''}`;
     body = it ? cardHtml(it, st, mode)
-      : `<div class="flash"><p class="prompt-ja">${miss.size===0 && got.size ? '復習リストはすべてクリアしました。' : 'まだ間違えた問題はありません。'}</p>
-          <p class="where-sm">瞬間英作文で答えを見て「もう一度」を押すと、その問題がここに記録されます。</p>
+      : `<div class="flash"><p class="prompt-ja">${miss.size===0 && got.size ? '復習リストはすべてクリアしました。' : 'まだ分からなかった問題はありません。'}</p>
+          <p class="where-sm">瞬間英作文で答えを見て「分からなかった」を押すと、その問題がここに記録されます。</p>
           <div class="empty-actions"><button class="hbtn main" id="go-drill">瞬間英作文へ</button></div></div>`;
   }
   const foot = it ? `<div class="nav"><button class="ghost" id="d-prev" ${st.idx===0?'disabled':''}>← 前へ</button><button class="ghost" id="d-next">次へ →</button></div>` : '';
