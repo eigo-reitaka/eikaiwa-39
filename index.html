@@ -33,7 +33,7 @@ button:focus-visible,select:focus-visible{outline:2px solid var(--accent);outlin
 
 header.top{display:grid;gap:14px;padding-bottom:18px}
 .eyebrow{font-size:12px;letter-spacing:.14em;color:var(--muted);font-weight:500}
-h1{font-family:var(--f-jp);font-weight:700;font-size:clamp(26px,6vw,36px);line-height:1.3;margin:0;text-wrap:balance}
+h1{word-break:auto-phrase;font-family:var(--f-jp);font-weight:700;font-size:clamp(26px,6vw,36px);line-height:1.3;margin:0;text-wrap:balance}
 h1 .num{font-family:var(--f-display);font-weight:400;font-size:1.5em;color:var(--accent);margin-left:.1em;line-height:1}
 .lead{margin:0;color:var(--muted);max-width:60ch}
 
@@ -111,7 +111,7 @@ mark{background:linear-gradient(transparent 52%,var(--marker) 52%);color:inherit
 .tally b{color:var(--ok)}
 .flash{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px 22px;display:grid;gap:18px;min-height:340px}
 .flash-meta{display:flex;justify-content:space-between;gap:10px;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
-.prompt-ja{font-size:clamp(20px,5vw,25px);font-weight:700;line-height:1.55;margin:0;text-wrap:balance}
+.prompt-ja{word-break:auto-phrase;font-size:clamp(20px,5vw,25px);font-weight:700;line-height:1.55;margin:0;text-wrap:balance}
 .where-sm{font-size:13px;color:var(--muted)}
 .hints{display:flex;flex-wrap:wrap;gap:8px}
 .hbtn{border:1px solid var(--accent);color:var(--accent);background:transparent;border-radius:999px;padding:6px 14px;font-size:14px;font-weight:500}
@@ -132,7 +132,7 @@ mark{background:linear-gradient(transparent 52%,var(--marker) 52%);color:inherit
 footer{margin-top:48px;font-size:12px;color:var(--muted)}
 @media (prefers-reduced-motion: no-preference){.hint,.answer{animation:in .18s ease-out}}
 @keyframes in{from{opacity:.4;transform:translateY(3px)}to{opacity:1;transform:none}}
-@media (max-width:440px){.mode-seg button{padding:6px 10px;font-size:13px}.body{padding:16px}.pat{font-size:21px}.flash{padding:20px 16px}}
+@media (max-width:440px){.mode-seg{display:grid;grid-template-columns:1fr 1fr;width:100%;border-radius:14px;gap:2px}.mode-seg button{border-radius:10px;padding:7px 8px;white-space:nowrap}.mode-seg button:last-child{grid-column:1 / -1}.controls{gap:8px}.body{padding:16px}.pat{font-size:21px}.flash{padding:20px 16px}}
 </style>
 
 </head>
