@@ -206,7 +206,7 @@ function renderLearn(){
     for(const it of items){
       const bMarked = norm(it.b).includes(norm(it.hl[0])) ? marked(it.b, it.hl) : esc(it.b);
       html += `<article class="card">
-        <figure class="pic"><img src="img/${it.n}.webp" alt="${esc(it.scene)}の場面のイラスト" width="960" height="640" loading="lazy" decoding="async"></figure>
+        <figure class="pic"><img src="${it.n}.webp" alt="${esc(it.scene)}の場面のイラスト" width="960" height="640" loading="lazy" decoding="async"></figure>
         <div class="body"><div class="head">
         <div class="card-top"><span class="no">${it.n}</span><h3 class="pat">${esc(it.pat)}</h3><div class="mean">${esc(it.mean)}</div></div>
         <div class="example"><div class="label">例文</div>
